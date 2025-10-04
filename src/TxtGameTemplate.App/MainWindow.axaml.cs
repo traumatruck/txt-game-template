@@ -20,6 +20,12 @@ public partial class MainWindow : Window
     private int _rpsWins = 0;
     private int _rpsLosses = 0;
     private int _rpsTies = 0;
+    
+    // Menu system state
+    private bool _inMenuMode = false;
+    private List<MenuItem> _currentMenuItems = [];
+    private int _selectedMenuIndex = 0;
+    private int _menuContentStartLength = 0;
 
     public MainWindow()
     {
@@ -105,6 +111,43 @@ public partial class MainWindow : Window
 
     private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
     {
+        // Handle menu mode navigation
+        if (_inMenuMode)
+        {
+            switch (e.Key)
+            {
+                case Key.Up:
+                    if (_selectedMenuIndex > 0)
+                    {
+                        _selectedMenuIndex--;
+                        RenderMenu();
+                    }
+                    e.Handled = true;
+                    break;
+                    
+                case Key.Down:
+                    if (_selectedMenuIndex < _currentMenuItems.Count - 1)
+                    {
+                        _selectedMenuIndex++;
+                        RenderMenu();
+                    }
+                    e.Handled = true;
+                    break;
+                    
+                case Key.Enter:
+                    ExecuteMenuItem(_currentMenuItems[_selectedMenuIndex]);
+                    e.Handled = true;
+                    break;
+                    
+                case Key.Escape:
+                    ExitMenuMode();
+                    e.Handled = true;
+                    break;
+            }
+            return;
+        }
+        
+        // Normal command mode
         switch (e.Key)
         {
             case Key.Enter:
@@ -217,6 +260,10 @@ public partial class MainWindow : Window
             case "rpsstats":
                 ShowRpsStats();
                 break;
+            
+            case "menu":
+                ShowDemoMenu();
+                break;
 
             case "exit":
             case "quit":
@@ -241,6 +288,7 @@ public partial class MainWindow : Window
         WriteToTerminal("  color <color> - Change terminal text color (green|amber|white|cyan)");
         WriteToTerminal("  rps <choice>  - Play Rock Paper Scissors (rock/paper/scissors or r/p/s)");
         WriteToTerminal("  rpsstats      - Show your RPS win/loss record");
+        WriteToTerminal("  menu          - Show demo menu (navigate with ↑↓, select with Enter)");
         WriteToTerminal("  exit / quit   - Exit the application");
     }
     
@@ -332,5 +380,98 @@ public partial class MainWindow : Window
 
         // Auto-scroll to bottom
         OutputScroller.ScrollToEnd();
+    }
+    
+    // ===== Menu System =====
+    
+    private void ShowMenu(string title, List<MenuItem> items)
+    {
+        // Clear terminal before showing menu
+        ClearTerminal();
+        
+        _inMenuMode = true;
+        _currentMenuItems = items;
+        _selectedMenuIndex = 0;
+        CommandInput.IsReadOnly = true;
+        CommandInput.Text = "";
+        
+        WriteToTerminal($"╔══════════════════════════════════════════════════════════╗");
+        WriteToTerminal($"  {title}");
+        WriteToTerminal($"╚══════════════════════════════════════════════════════════╝");
+        WriteToTerminal("");
+        
+        // Store the position where menu items start
+        _menuContentStartLength = _terminalText.Length;
+        
+        RenderMenu();
+    }
+    
+    private void RenderMenu()
+    {
+        // Remove everything after the menu content start position
+        _terminalText.Length = _menuContentStartLength;
+        
+        // Render menu items
+        for (int i = 0; i < _currentMenuItems.Count; i++)
+        {
+            var item = _currentMenuItems[i];
+            var prefix = i == _selectedMenuIndex ? "► " : "  ";
+            var line = $"{prefix}{item.Label}";
+            
+            _terminalText.AppendLine(line);
+        }
+        
+        _terminalText.AppendLine("");
+        _terminalText.AppendLine("Use ↑↓ arrows to navigate, Enter to select, Esc to exit");
+        
+        TerminalOutput.Text = _terminalText.ToString();
+    }
+    
+    private void ExecuteMenuItem(MenuItem item)
+    {
+        ExitMenuMode();
+        WriteToTerminal($"> Selected: {item.Label}");
+        WriteToTerminal("");
+        item.Action?.Invoke();
+        WriteToTerminal("");
+    }
+    
+    private void ExitMenuMode()
+    {
+        _inMenuMode = false;
+        _currentMenuItems.Clear();
+        _selectedMenuIndex = 0;
+        CommandInput.IsReadOnly = false;
+        CommandInput.Text = "";
+    }
+    
+    private void ShowDemoMenu()
+    {
+        var menuItems = new List<MenuItem>
+        {
+            new MenuItem("Play Rock Paper Scissors", () => WriteToTerminal("Type 'rps rock', 'rps paper', or 'rps scissors' to play!")),
+            new MenuItem("View RPS Statistics", ShowRpsStats),
+            new MenuItem("Change Color to Green", () => ChangeColor("green")),
+            new MenuItem("Change Color to Amber", () => ChangeColor("amber")),
+            new MenuItem("Change Color to Cyan", () => ChangeColor("cyan")),
+            new MenuItem("Clear Terminal", ClearTerminal),
+            new MenuItem("Show Help", ShowHelp),
+            new MenuItem("Exit Menu", () => WriteToTerminal("Menu closed"))
+        };
+        
+        ShowMenu("MAIN MENU", menuItems);
+    }
+}
+
+// Helper class for menu items
+public class MenuItem
+{
+    public string Label { get; set; }
+    public Action? Action { get; set; }
+    
+    public MenuItem(string label, Action? action = null)
+    {
+        Label = label;
+        Action = action;
     }
 }
