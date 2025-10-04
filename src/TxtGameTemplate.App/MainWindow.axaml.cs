@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -18,6 +19,11 @@ public partial class MainWindow : Window
     // UI State
     private readonly List<string> _commandHistory = [];
     private int _historyIndex = -1;
+    
+    // Auto-complete state
+    private List<string> _autoCompleteMatches = [];
+    private int _autoCompleteIndex = -1;
+    private string _autoCompletePrefix = string.Empty;
     
     // Menu system state
     private bool _inMenuMode = false;
@@ -241,7 +247,74 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
             }
+            case Key.Tab:
+            {
+                // Auto-complete command names
+                var currentText = CommandInput.Text?.Trim() ?? string.Empty;
+                
+                // If text changed or first Tab press, build new match list
+                if (currentText != _autoCompletePrefix || _autoCompleteMatches.Count == 0)
+                {
+                    _autoCompletePrefix = currentText;
+                    _autoCompleteMatches = GetAutoCompleteMatches(currentText);
+                    _autoCompleteIndex = -1;
+                }
+                
+                // Cycle through matches
+                if (_autoCompleteMatches.Count > 0)
+                {
+                    _autoCompleteIndex = (_autoCompleteIndex + 1) % _autoCompleteMatches.Count;
+                    CommandInput.Text = _autoCompleteMatches[_autoCompleteIndex];
+                    CommandInput.CaretIndex = CommandInput.Text.Length;
+                }
+                
+                e.Handled = true;
+                break;
+            }
+            default:
+                // Reset auto-complete state when user types
+                _autoCompleteMatches.Clear();
+                _autoCompleteIndex = -1;
+                _autoCompletePrefix = string.Empty;
+                break;
         }
+    }
+    
+    private List<string> GetAutoCompleteMatches(string prefix)
+    {
+        if (string.IsNullOrWhiteSpace(prefix))
+        {
+            // If no prefix, return all command names and aliases
+            var allCommands = new List<string>();
+            foreach (var command in _commandRegistry.GetAllCommands())
+            {
+                allCommands.Add(command.Name);
+                allCommands.AddRange(command.Aliases);
+            }
+            return allCommands.OrderBy(c => c).ToList();
+        }
+        
+        // Find commands that start with the prefix
+        var matches = new List<string>();
+        var lowerPrefix = prefix.ToLower();
+        
+        foreach (var command in _commandRegistry.GetAllCommands())
+        {
+            if (command.Name.StartsWith(lowerPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                matches.Add(command.Name);
+            }
+            
+            foreach (var alias in command.Aliases)
+            {
+                if (alias.StartsWith(lowerPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    matches.Add(alias);
+                }
+            }
+        }
+        
+        return matches.OrderBy(m => m).ToList();
     }
 
     private void OnCommandInputLostFocus(object? sender, RoutedEventArgs e)
