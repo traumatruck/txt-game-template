@@ -14,6 +14,12 @@ public partial class MainWindow : Window
     private readonly List<string> _commandHistory = [];
     private int _historyIndex = -1;
     private readonly StringBuilder _terminalText = new();
+    private readonly Random _random = new();
+    
+    // RPS Game state
+    private int _rpsWins = 0;
+    private int _rpsLosses = 0;
+    private int _rpsTies = 0;
 
     public MainWindow()
     {
@@ -56,7 +62,7 @@ public partial class MainWindow : Window
             
             // Change separator border color
             var separatorBorder = this.FindControl<Border>("SeparatorBorder");
-            
+
             if (separatorBorder != null)
             {
                 separatorBorder.BorderBrush = brush;
@@ -201,6 +207,17 @@ public partial class MainWindow : Window
                     WriteToTerminal("Usage: color <green|amber|white|cyan>");
                 break;
 
+            case "rps":
+                if (parts.Length > 1)
+                    PlayRockPaperScissors(parts[1]);
+                else
+                    ShowRpsHelp();
+                break;
+            
+            case "rpsstats":
+                ShowRpsStats();
+                break;
+
             case "exit":
             case "quit":
                 Close();
@@ -222,7 +239,90 @@ public partial class MainWindow : Window
         WriteToTerminal("  clear / cls   - Clear the terminal screen");
         WriteToTerminal("  echo <text>   - Echo text to the terminal");
         WriteToTerminal("  color <color> - Change terminal text color (green|amber|white|cyan)");
+        WriteToTerminal("  rps <choice>  - Play Rock Paper Scissors (rock/paper/scissors or r/p/s)");
+        WriteToTerminal("  rpsstats      - Show your RPS win/loss record");
         WriteToTerminal("  exit / quit   - Exit the application");
+    }
+    
+    private void ShowRpsHelp()
+    {
+        WriteToTerminal("Rock Paper Scissors Game");
+        WriteToTerminal("Usage: rps <choice>");
+        WriteToTerminal("  Choices: rock, paper, scissors (or r, p, s)");
+        WriteToTerminal("  Example: rps rock");
+        WriteToTerminal("");
+        WriteToTerminal("Check your stats with: rpsstats");
+    }
+    
+    private void PlayRockPaperScissors(string playerChoice)
+    {
+        // Normalize player choice
+        var choice = playerChoice.ToLower() switch
+        {
+            "r" or "rock" => "rock",
+            "p" or "paper" => "paper",
+            "s" or "scissors" => "scissors",
+            _ => null
+        };
+        
+        if (choice == null)
+        {
+            WriteToTerminal("Invalid choice! Use: rock, paper, scissors (or r, p, s)");
+            return;
+        }
+        
+        // Computer makes random choice
+        var choices = new[] { "rock", "paper", "scissors" };
+        var computerChoice = choices[_random.Next(choices.Length)];
+        
+        WriteToTerminal($"You chose: {choice}");
+        WriteToTerminal($"Computer chose: {computerChoice}");
+        WriteToTerminal("");
+        
+        // Determine winner
+        if (choice == computerChoice)
+        {
+            WriteToTerminal("It's a TIE!");
+            _rpsTies++;
+        }
+        else if (
+            (choice == "rock" && computerChoice == "scissors") ||
+            (choice == "paper" && computerChoice == "rock") ||
+            (choice == "scissors" && computerChoice == "paper"))
+        {
+            WriteToTerminal("★ YOU WIN! ★");
+            _rpsWins++;
+        }
+        else
+        {
+            WriteToTerminal("You LOSE!");
+            _rpsLosses++;
+        }
+        
+        WriteToTerminal($"Record: {_rpsWins}W - {_rpsLosses}L - {_rpsTies}T");
+    }
+    
+    private void ShowRpsStats()
+    {
+        WriteToTerminal("═══════════════════════════════════");
+        WriteToTerminal("  ROCK PAPER SCISSORS STATISTICS");
+        WriteToTerminal("═══════════════════════════════════");
+        WriteToTerminal($"  Wins:   {_rpsWins}");
+        WriteToTerminal($"  Losses: {_rpsLosses}");
+        WriteToTerminal($"  Ties:   {_rpsTies}");
+        
+        var totalGames = _rpsWins + _rpsLosses + _rpsTies;
+        if (totalGames > 0)
+        {
+            var winRate = (double)_rpsWins / totalGames * 100;
+            WriteToTerminal($"  Total:  {totalGames} games");
+            WriteToTerminal($"  Win %:  {winRate:F1}%");
+        }
+        else
+        {
+            WriteToTerminal("  No games played yet!");
+        }
+        WriteToTerminal("═══════════════════════════════════");
     }
 
     private void WriteToTerminal(string text)
