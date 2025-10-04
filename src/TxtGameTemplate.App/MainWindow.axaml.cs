@@ -38,13 +38,28 @@ public partial class MainWindow : Window
         if (colorValue != null)
         {
             var brush = new SolidColorBrush(Color.Parse(colorValue));
+            
+            // Change text colors
             TerminalOutput.Foreground = brush;
             CommandInput.Foreground = brush;
-            var promptText = this.FindControl<TextBlock>("Prompt");
             
+            // Change caret color
+            CommandInput.CaretBrush = brush;
+            
+            // Change prompt color
+            var promptText = this.FindControl<TextBlock>("Prompt");
+
             if (promptText != null)
             {
                 promptText.Foreground = brush;
+            }
+            
+            // Change separator border color
+            var separatorBorder = this.FindControl<Border>("SeparatorBorder");
+            
+            if (separatorBorder != null)
+            {
+                separatorBorder.BorderBrush = brush;
             }
             
             WriteToTerminal($"Color changed to {color}");

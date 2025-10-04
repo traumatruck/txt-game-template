@@ -51,6 +51,7 @@
 
         <!-- Command Input Area -->
         <Border Grid.Row="1"
+                Name="SeparatorBorder"
                 Background="#000000"
                 BorderBrush="#00FF00"
                 BorderThickness="0,1,0,0"
