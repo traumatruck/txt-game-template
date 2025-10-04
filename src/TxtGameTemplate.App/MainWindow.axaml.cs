@@ -103,15 +103,18 @@ public partial class MainWindow : Window
         // Set up event handlers
         CommandInput.KeyDown += OnCommandInputKeyDown;
         CommandInput.LostFocus += OnCommandInputLostFocus;
+        
+        // Handle keyboard input at window level for menu navigation
+        this.KeyDown += OnWindowKeyDown;
 
         // Prevent focus from leaving the command input
         TerminalOutput.Focusable = false;
         TerminalOutput.IsReadOnly = true;
     }
-
-    private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
+    
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
-        // Handle menu mode navigation
+        // Only handle menu navigation at window level when in menu mode
         if (_inMenuMode)
         {
             switch (e.Key)
@@ -144,6 +147,14 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     break;
             }
+        }
+    }
+
+    private void OnCommandInputKeyDown(object? sender, KeyEventArgs e)
+    {
+        // Menu mode is handled at window level now
+        if (_inMenuMode)
+        {
             return;
         }
         
@@ -395,6 +406,9 @@ public partial class MainWindow : Window
         CommandInput.IsReadOnly = true;
         CommandInput.Text = "";
         
+        // Hide the command input area
+        SeparatorBorder.IsVisible = false;
+        
         WriteToTerminal($"╔══════════════════════════════════════════════════════════╗");
         WriteToTerminal($"  {title}");
         WriteToTerminal($"╚══════════════════════════════════════════════════════════╝");
@@ -443,6 +457,9 @@ public partial class MainWindow : Window
         _selectedMenuIndex = 0;
         CommandInput.IsReadOnly = false;
         CommandInput.Text = "";
+        
+        // Show the command input area again
+        SeparatorBorder.IsVisible = true;
     }
     
     private void ShowDemoMenu()
