@@ -1,0 +1,77 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="TxtGameTemplate.App.MainWindow"
+        Title="Text Game Terminal"
+        Background="#000000"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Styles>
+        <Style Selector="TextBox.terminal">
+            <Setter Property="Background" Value="#000000" />
+            <Setter Property="Foreground" Value="#00FF00" />
+            <Setter Property="FontFamily" Value="Consolas,Courier New,monospace" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="10" />
+            <Setter Property="CaretBrush" Value="#00FF00" />
+        </Style>
+
+        <Style Selector="TextBox.terminal:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#000000" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style Selector="TextBox.terminal:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="#000000" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+
+        <Style Selector="ScrollViewer.terminal">
+            <Setter Property="Background" Value="#000000" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="*,Auto" Background="#000000">
+        <!-- Terminal Output Area -->
+        <ScrollViewer Grid.Row="0"
+                      Classes="terminal"
+                      Name="OutputScroller"
+                      VerticalScrollBarVisibility="Auto">
+            <TextBox Name="TerminalOutput"
+                     Classes="terminal"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     BorderThickness="0"
+                     Padding="10" />
+        </ScrollViewer>
+
+        <!-- Command Input Area -->
+        <Border Grid.Row="1"
+                Background="#000000"
+                BorderBrush="#00FF00"
+                BorderThickness="0,1,0,0"
+                Padding="10">
+            <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Grid.Column="0"
+                           Name="Prompt"
+                           Text=">"
+                           Foreground="#00FF00"
+                           FontFamily="Consolas,Courier New,monospace"
+                           FontSize="16"
+                           Margin="0,0,5,0"
+                           VerticalAlignment="Center" />
+                <TextBox Grid.Column="1"
+                         Name="CommandInput"
+                         Classes="terminal"
+                         Watermark="Enter command..."
+                         Padding="0"
+                         VerticalAlignment="Center"
+                         VerticalContentAlignment="Center" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
