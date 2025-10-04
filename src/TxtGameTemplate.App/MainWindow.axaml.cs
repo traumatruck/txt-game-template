@@ -30,6 +30,10 @@ public partial class MainWindow : Window
     private List<MenuItem> _currentMenuItems = [];
     private int _selectedMenuIndex = 0;
     private int _menuContentStartLength = 0;
+    
+    // Panel demo state
+    private bool _inPanelMode = false;
+    private PanelLayout? _panelLayout = null;
 
     public MainWindow()
     {
@@ -61,6 +65,7 @@ public partial class MainWindow : Window
         // UI commands
         _commandRegistry.Register(new ColorCommand(this, _terminalService));
         _commandRegistry.Register(new MenuCommand(this));
+        _commandRegistry.Register(new PanelsCommand(this));
     }
 
     public void ChangeColor(string color)
@@ -140,7 +145,34 @@ public partial class MainWindow : Window
     
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
-        // Only handle menu navigation at window level when in menu mode
+        // Handle panel demo navigation
+        if (_inPanelMode && _panelLayout != null)
+        {
+            switch (e.Key)
+            {
+                case Key.Left:
+                case Key.Up:
+                    _panelLayout.MovePrevious();
+                    RenderPanels();
+                    e.Handled = true;
+                    break;
+                    
+                case Key.Right:
+                case Key.Down:
+                    _panelLayout.MoveNext();
+                    RenderPanels();
+                    e.Handled = true;
+                    break;
+                    
+                case Key.Escape:
+                    ExitPanelMode();
+                    e.Handled = true;
+                    break;
+            }
+            return;
+        }
+        
+        // Handle menu navigation at window level when in menu mode
         if (_inMenuMode)
         {
             switch (e.Key)
@@ -417,6 +449,50 @@ public partial class MainWindow : Window
         };
         
         ShowMenu("MAIN MENU", menuItems);
+    }
+    
+    // ===== Panel Demo System =====
+    
+    public void ShowPanelDemo()
+    {
+        // Clear terminal and enter panel mode
+        _terminalService.Clear();
+        
+        _inPanelMode = true;
+        _panelLayout = new PanelLayout();
+        CommandInput.IsReadOnly = true;
+        CommandInput.Text = "";
+        
+        // Hide the command input area
+        SeparatorBorder.IsVisible = false;
+        
+        RenderPanels();
+    }
+    
+    private void RenderPanels()
+    {
+        if (_panelLayout == null) return;
+        
+        _terminalService.Clear();
+        var panelDisplay = _panelLayout.Render();
+        _terminalService.WriteLine(panelDisplay);
+    }
+    
+    private void ExitPanelMode()
+    {
+        _inPanelMode = false;
+        _panelLayout = null;
+        CommandInput.IsReadOnly = false;
+        CommandInput.Text = "";
+        
+        // Show the command input area again
+        SeparatorBorder.IsVisible = true;
+        
+        // Restore focus to command input
+        CommandInput.Focus();
+        
+        _terminalService.WriteLine("Panel demo closed");
+        _terminalService.WriteLine("");
     }
 }
 
