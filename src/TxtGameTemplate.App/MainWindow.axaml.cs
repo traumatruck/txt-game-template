@@ -1,25 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using TxtGameTemplate.App.Commands;
+using TxtGameTemplate.App.Services;
 
 namespace TxtGameTemplate.App;
 
 public partial class MainWindow : Window
 {
+    // Services
+    private readonly TerminalService _terminalService;
+    private readonly CommandRegistry _commandRegistry;
+    
+    // UI State
     private readonly List<string> _commandHistory = [];
     private int _historyIndex = -1;
-    private readonly StringBuilder _terminalText = new();
-    private readonly Random _random = new();
-    
-    // RPS Game state
-    private int _rpsWins = 0;
-    private int _rpsLosses = 0;
-    private int _rpsTies = 0;
     
     // Menu system state
     private bool _inMenuMode = false;
@@ -30,13 +28,36 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        
+        // Initialize services
+        _terminalService = new TerminalService(TerminalOutput, OutputScroller);
+        _commandRegistry = new CommandRegistry();
+        
+        // Register built-in commands
+        RegisterCommands();
+        
         InitializeTerminal();
 
         // Ensure focus is set after window is fully loaded
         Opened += OnWindowOpened;
     }
+    
+    private void RegisterCommands()
+    {
+        // System commands
+        _commandRegistry.Register(new ClearCommand(_terminalService));
+        _commandRegistry.Register(new HelpCommand(_terminalService, _commandRegistry));
+        _commandRegistry.Register(new EchoCommand(_terminalService));
+        
+        // Game commands
+        _commandRegistry.Register(new RpsCommand(_terminalService));
+        
+        // UI commands
+        _commandRegistry.Register(new ColorCommand(this, _terminalService));
+        _commandRegistry.Register(new MenuCommand(this));
+    }
 
-    private void ChangeColor(string color)
+    public void ChangeColor(string color)
     {
         var colorValue = color.ToLower() switch
         {
@@ -74,38 +95,37 @@ public partial class MainWindow : Window
                 separatorBorder.BorderBrush = brush;
             }
             
-            WriteToTerminal($"Color changed to {color}");
+            _terminalService.WriteLine($"Color changed to {color}");
         }
         else
         {
-            WriteToTerminal($"Unknown color: {color}");
-            WriteToTerminal("Available colors: green, amber, white, cyan");
+            _terminalService.WriteLine($"Unknown color: {color}");
+            _terminalService.WriteLine("Available colors: green, amber, white, cyan");
         }
     }
 
     private void ClearTerminal()
     {
-        _terminalText.Clear();
-        TerminalOutput.Text = string.Empty;
+        _terminalService.Clear();
     }
 
     private void InitializeTerminal()
     {
         // Display welcome message
-        WriteToTerminal("╔═══════════════════════════════════════════════════════════╗");
-        WriteToTerminal("║          TEXT GAME FRAMEWORK v1.0                         ║");
-        WriteToTerminal("║          Retro Style Terminal                             ║");
-        WriteToTerminal("╚═══════════════════════════════════════════════════════════╝");
-        WriteToTerminal("");
-        WriteToTerminal("Type 'help' for available commands.");
-        WriteToTerminal("");
+        _terminalService.WriteLine("╔═══════════════════════════════════════════════════════════╗");
+        _terminalService.WriteLine("║          TEXT GAME FRAMEWORK v1.0                         ║");
+        _terminalService.WriteLine("║          Retro Style Terminal                             ║");
+        _terminalService.WriteLine("╚═══════════════════════════════════════════════════════════╝");
+        _terminalService.WriteLine("");
+        _terminalService.WriteLine("Type 'help' for available commands.");
+        _terminalService.WriteLine("");
 
         // Set up event handlers
         CommandInput.KeyDown += OnCommandInputKeyDown;
         CommandInput.LostFocus += OnCommandInputLostFocus;
         
         // Handle keyboard input at window level for menu navigation
-        this.KeyDown += OnWindowKeyDown;
+        KeyDown += OnWindowKeyDown;
 
         // Prevent focus from leaving the command input
         TerminalOutput.Focusable = false;
@@ -168,14 +188,20 @@ public partial class MainWindow : Window
                 if (!string.IsNullOrWhiteSpace(command))
                 {
                     // Echo command to terminal
-                    WriteToTerminal($"> {command}");
+                    _terminalService.WriteLine($"> {command}");
 
                     // Add to history
                     _commandHistory.Add(command);
                     _historyIndex = _commandHistory.Count;
 
-                    // Process command
-                    ProcessCommand(command);
+                    // Process command through registry
+                    if (!_commandRegistry.TryExecute(command))
+                    {
+                        _terminalService.WriteLine($"Unknown command: {command.Split(' ')[0]}");
+                        _terminalService.WriteLine("Type 'help' for available commands.");
+                    }
+                    
+                    _terminalService.WriteLine("");
 
                     // Clear input
                     CommandInput.Text = string.Empty;
@@ -230,168 +256,8 @@ public partial class MainWindow : Window
         CommandInput.Focus();
     }
 
-    private void ProcessCommand(string command)
-    {
-        var parts = command.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-        if (parts.Length == 0)
-        {
-            return;
-        }
-
-        switch (parts[0])
-        {
-            case "help":
-                ShowHelp();
-                break;
-
-            case "clear":
-            case "cls":
-                ClearTerminal();
-                break;
-
-            case "echo":
-                if (parts.Length > 1) WriteToTerminal(string.Join(" ", parts.Skip(1)));
-                break;
-
-            case "color":
-                if (parts.Length > 1)
-                    ChangeColor(parts[1]);
-                else
-                    WriteToTerminal("Usage: color <green|amber|white|cyan>");
-                break;
-
-            case "rps":
-                if (parts.Length > 1)
-                    PlayRockPaperScissors(parts[1]);
-                else
-                    ShowRpsHelp();
-                break;
-            
-            case "rpsstats":
-                ShowRpsStats();
-                break;
-            
-            case "menu":
-                ShowDemoMenu();
-                break;
-
-            case "exit":
-            case "quit":
-                Close();
-                break;
-
-            default:
-                WriteToTerminal($"Unknown command: {parts[0]}");
-                WriteToTerminal("Type 'help' for available commands.");
-                break;
-        }
-
-        WriteToTerminal("");
-    }
-
-    private void ShowHelp()
-    {
-        WriteToTerminal("Available commands:");
-        WriteToTerminal("  help          - Show this help message");
-        WriteToTerminal("  clear / cls   - Clear the terminal screen");
-        WriteToTerminal("  echo <text>   - Echo text to the terminal");
-        WriteToTerminal("  color <color> - Change terminal text color (green|amber|white|cyan)");
-        WriteToTerminal("  rps <choice>  - Play Rock Paper Scissors (rock/paper/scissors or r/p/s)");
-        WriteToTerminal("  rpsstats      - Show your RPS win/loss record");
-        WriteToTerminal("  menu          - Show demo menu (navigate with ↑↓, select with Enter)");
-        WriteToTerminal("  exit / quit   - Exit the application");
-    }
-    
-    private void ShowRpsHelp()
-    {
-        WriteToTerminal("Rock Paper Scissors Game");
-        WriteToTerminal("Usage: rps <choice>");
-        WriteToTerminal("  Choices: rock, paper, scissors (or r, p, s)");
-        WriteToTerminal("  Example: rps rock");
-        WriteToTerminal("");
-        WriteToTerminal("Check your stats with: rpsstats");
-    }
-    
-    private void PlayRockPaperScissors(string playerChoice)
-    {
-        // Normalize player choice
-        var choice = playerChoice.ToLower() switch
-        {
-            "r" or "rock" => "rock",
-            "p" or "paper" => "paper",
-            "s" or "scissors" => "scissors",
-            _ => null
-        };
-        
-        if (choice == null)
-        {
-            WriteToTerminal("Invalid choice! Use: rock, paper, scissors (or r, p, s)");
-            return;
-        }
-        
-        // Computer makes random choice
-        var choices = new[] { "rock", "paper", "scissors" };
-        var computerChoice = choices[_random.Next(choices.Length)];
-        
-        WriteToTerminal($"You chose: {choice}");
-        WriteToTerminal($"Computer chose: {computerChoice}");
-        WriteToTerminal("");
-        
-        // Determine winner
-        if (choice == computerChoice)
-        {
-            WriteToTerminal("It's a TIE!");
-            _rpsTies++;
-        }
-        else if (
-            (choice == "rock" && computerChoice == "scissors") ||
-            (choice == "paper" && computerChoice == "rock") ||
-            (choice == "scissors" && computerChoice == "paper"))
-        {
-            WriteToTerminal("★ YOU WIN! ★");
-            _rpsWins++;
-        }
-        else
-        {
-            WriteToTerminal("You LOSE!");
-            _rpsLosses++;
-        }
-        
-        WriteToTerminal($"Record: {_rpsWins}W - {_rpsLosses}L - {_rpsTies}T");
-    }
-    
-    private void ShowRpsStats()
-    {
-        WriteToTerminal("═══════════════════════════════════");
-        WriteToTerminal("  ROCK PAPER SCISSORS STATISTICS");
-        WriteToTerminal("═══════════════════════════════════");
-        WriteToTerminal($"  Wins:   {_rpsWins}");
-        WriteToTerminal($"  Losses: {_rpsLosses}");
-        WriteToTerminal($"  Ties:   {_rpsTies}");
-        
-        var totalGames = _rpsWins + _rpsLosses + _rpsTies;
-        if (totalGames > 0)
-        {
-            var winRate = (double)_rpsWins / totalGames * 100;
-            WriteToTerminal($"  Total:  {totalGames} games");
-            WriteToTerminal($"  Win %:  {winRate:F1}%");
-        }
-        else
-        {
-            WriteToTerminal("  No games played yet!");
-        }
-        WriteToTerminal("═══════════════════════════════════");
-    }
-
-    private void WriteToTerminal(string text)
-    {
-        _terminalText.AppendLine(text);
-        TerminalOutput.Text = _terminalText.ToString();
-
-        // Auto-scroll to bottom
-        OutputScroller.ScrollToEnd();
-    }
+    // All command logic has been moved to Commands/ folder
+    // Commands are now handled through CommandRegistry
     
     // ===== Menu System =====
     
@@ -409,13 +275,13 @@ public partial class MainWindow : Window
         // Hide the command input area
         SeparatorBorder.IsVisible = false;
         
-        WriteToTerminal($"╔══════════════════════════════════════════════════════════╗");
-        WriteToTerminal($"  {title}");
-        WriteToTerminal($"╚══════════════════════════════════════════════════════════╝");
-        WriteToTerminal("");
+        _terminalService.WriteLine($"╔══════════════════════════════════════════════════════════╗");
+        _terminalService.WriteLine($"  {title}");
+        _terminalService.WriteLine($"╚══════════════════════════════════════════════════════════╝");
+        _terminalService.WriteLine("");
         
         // Store the position where menu items start
-        _menuContentStartLength = _terminalText.Length;
+        _menuContentStartLength = _terminalService.GetTextLength();
         
         RenderMenu();
     }
@@ -423,31 +289,29 @@ public partial class MainWindow : Window
     private void RenderMenu()
     {
         // Remove everything after the menu content start position
-        _terminalText.Length = _menuContentStartLength;
+        _terminalService.SetTextLength(_menuContentStartLength);
         
         // Render menu items
-        for (int i = 0; i < _currentMenuItems.Count; i++)
+        for (var i = 0; i < _currentMenuItems.Count; i++)
         {
             var item = _currentMenuItems[i];
             var prefix = i == _selectedMenuIndex ? "► " : "  ";
             var line = $"{prefix}{item.Label}";
             
-            _terminalText.AppendLine(line);
+            _terminalService.WriteLine(line);
         }
         
-        _terminalText.AppendLine("");
-        _terminalText.AppendLine("Use ↑↓ arrows to navigate, Enter to select, Esc to exit");
-        
-        TerminalOutput.Text = _terminalText.ToString();
+        _terminalService.WriteLine("");
+        _terminalService.WriteLine("Use ↑↓ arrows to navigate, Enter to select, Esc to exit");
     }
     
     private void ExecuteMenuItem(MenuItem item)
     {
         ExitMenuMode();
-        WriteToTerminal($"> Selected: {item.Label}");
-        WriteToTerminal("");
+        _terminalService.WriteLine($"> Selected: {item.Label}");
+        _terminalService.WriteLine("");
         item.Action?.Invoke();
-        WriteToTerminal("");
+        _terminalService.WriteLine("");
     }
     
     private void ExitMenuMode()
@@ -460,20 +324,23 @@ public partial class MainWindow : Window
         
         // Show the command input area again
         SeparatorBorder.IsVisible = true;
+        
+        // Restore focus to command input
+        CommandInput.Focus();
     }
     
-    private void ShowDemoMenu()
+    public void ShowDemoMenu()
     {
         var menuItems = new List<MenuItem>
         {
-            new MenuItem("Play Rock Paper Scissors", () => WriteToTerminal("Type 'rps rock', 'rps paper', or 'rps scissors' to play!")),
-            new MenuItem("View RPS Statistics", ShowRpsStats),
-            new MenuItem("Change Color to Green", () => ChangeColor("green")),
-            new MenuItem("Change Color to Amber", () => ChangeColor("amber")),
-            new MenuItem("Change Color to Cyan", () => ChangeColor("cyan")),
-            new MenuItem("Clear Terminal", ClearTerminal),
-            new MenuItem("Show Help", ShowHelp),
-            new MenuItem("Exit Menu", () => WriteToTerminal("Menu closed"))
+            new("Play Rock Paper Scissors", () => _terminalService.WriteLine("Type 'rps rock', 'rps paper', or 'rps scissors' to play!")),
+            new("View RPS Statistics", () => _commandRegistry.TryExecute("rps stats")),
+            new("Change Color to Green", () => ChangeColor("green")),
+            new("Change Color to Amber", () => ChangeColor("amber")),
+            new("Change Color to Cyan", () => ChangeColor("cyan")),
+            new("Clear Terminal", ClearTerminal),
+            new("Show Help", () => _commandRegistry.TryExecute("help")),
+            new("Exit Menu", () => _terminalService.WriteLine("Menu closed"))
         };
         
         ShowMenu("MAIN MENU", menuItems);
@@ -481,14 +348,9 @@ public partial class MainWindow : Window
 }
 
 // Helper class for menu items
-public class MenuItem
+public class MenuItem(string label, Action? action = null)
 {
-    public string Label { get; set; }
-    public Action? Action { get; set; }
-    
-    public MenuItem(string label, Action? action = null)
-    {
-        Label = label;
-        Action = action;
-    }
+    public string Label { get; set; } = label;
+
+    public Action? Action { get; set; } = action;
 }
